@@ -1,2 +1,2 @@
 # level-editor-3d
-3D Level Editor written in Java 
+:department_store: Level editor for 3D games like GTA 1 and 2
