@@ -38,10 +38,18 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.util.Arrays;
+import java.net.URI;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
 
+import com.badlogic.gdx.graphics.Camera;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.g2d.TextureAtlas;
+import com.badlogic.gdx.graphics.g2d.TextureAtlas.AtlasRegion;
+import com.badlogic.gdx.graphics.g3d.Model;
+import com.badlogic.gdx.math.Quaternion;
+import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.utils.Array;
 import com.delmesoft.editor3d.Constants;
 import com.delmesoft.editor3d.editor.tool.EntityTool.FileDescriptor;
 import com.delmesoft.editor3d.entity.Entity;
@@ -57,14 +65,6 @@ import com.delmesoft.editor3d.level.block.ChunkData;
 import com.delmesoft.editor3d.level.block.Side;
 import com.delmesoft.editor3d.presenter.Presenter;
 import com.delmesoft.editor3d.zone.Zone;
-import com.badlogic.gdx.graphics.Camera;
-import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.g2d.TextureAtlas;
-import com.badlogic.gdx.graphics.g2d.TextureAtlas.AtlasRegion;
-import com.badlogic.gdx.graphics.g3d.Model;
-import com.badlogic.gdx.math.Quaternion;
-import com.badlogic.gdx.math.Vector3;
-import com.badlogic.gdx.utils.Array;
 
 public class LevelIO {
 
@@ -75,7 +75,8 @@ public class LevelIO {
 	public static void loadLevel(File file, Presenter presenter) throws Exception {
 
 		long start = System.currentTimeMillis();
-
+		
+		final File base = file.getParentFile();
 		try (FileInputStream in = new FileInputStream(file);
 			 BufferedReader br = new BufferedReader(new InputStreamReader(new InflaterInputStream(in)))) {
 
@@ -86,7 +87,7 @@ public class LevelIO {
 			Settings settings = new Settings();
 
 			settings.initialize(values[0], Integer.valueOf(values[1]), Integer.valueOf(values[2]), Integer.valueOf(values[3]));
-			settings.texturePath = values[4];
+			settings.texturePath = new File(base, values[4]).getAbsolutePath();
 			settings.tileWidth  = Integer.valueOf(values[5]);
 			settings.tileHeight = Integer.valueOf(values[6]);
 			settings.margin     = Integer.valueOf(values[7]);
@@ -107,7 +108,7 @@ public class LevelIO {
 						
 			line = br.readLine();
 			values = Utils.uncapsulateString(SEPARATOR1, line);
-			level.getSkybox().loadTextureAtlas("null".equals(values[0]) ? null : values[0]);
+			level.getSkybox().loadTextureAtlas("null".equals(values[0]) ? null : new File(base, values[0]).getAbsolutePath());
 		
 			for(Side side : Side.values()) {
 				String name = values[side.ordinal() + 1];
@@ -152,10 +153,6 @@ public class LevelIO {
 					index = Integer.valueOf(tmp[0]);					
 					chunkData.getData()[index    ] = Long.valueOf(tmp[1]);
 					chunkData.getData()[index + 1] = Long.valueOf(tmp[2]);
-				/*	int type = chunkData.getGeometryType(index >> 1);
-					if(type > 13) {
-						chunkData.setGeometryType(index >> 1, type + 4);
-					}*/
 				}
 				
 			}
@@ -174,7 +171,7 @@ public class LevelIO {
 				if(fileDescriptor == null) {
 					fileDescriptor = new FileDescriptor();
 					fileDescriptor.name = values[1];
-					fileDescriptor.path = values[2];
+					fileDescriptor.path = new File(base, values[2]).getAbsolutePath();
 					fileDescriptors.add(fileDescriptor);
 				}
 				
@@ -203,7 +200,7 @@ public class LevelIO {
 				if(fileDescriptor == null) {
 					fileDescriptor = new FileDescriptor();
 					fileDescriptor.name = values[1];
-					fileDescriptor.path = values[2];
+					fileDescriptor.path = new File(base, values[2]).getAbsolutePath();
 					fileDescriptors.add(fileDescriptor);
 				}
 				TextureAtlas textureAtlas = FileManager.getInstance().get(fileDescriptor.path, TextureAtlas.class);
@@ -242,11 +239,12 @@ public class LevelIO {
 		Level level = presenter.getLevel();
 
 		Settings settings = level.getSettings();
-
+		
+		URI base = file.getParentFile().toURI();
 		try(FileOutputStream out = new FileOutputStream(file);
 			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new DeflaterOutputStream(out, true)))) {
-
-			String line = Utils.encapsulateString(SEPARATOR1, settings.levelName, settings.rWidth, settings.rHeight, settings.rDepth, settings.texturePath, settings.tileWidth, settings.tileHeight, settings.margin, settings.spacing);
+			String texturePath = relativize(base, settings.texturePath);
+			String line = Utils.encapsulateString(SEPARATOR1, settings.levelName, settings.rWidth, settings.rHeight, settings.rDepth, texturePath, settings.tileWidth, settings.tileHeight, settings.margin, settings.spacing);
 
 			// Level settings ************************************************
 			writer.write(line);
@@ -261,7 +259,7 @@ public class LevelIO {
 						
 			// Environment ************************************************
 			// Skybox
-			String textureAtlasPath = level.getSkybox().getTextureAtlasPath();
+			String textureAtlasPath = relativize(base, level.getSkybox().getTextureAtlasPath());
 			String[] regionNames = level.getSkybox().getAtlasRegionNames(Side.values());			
 			line = Utils.encapsulateString(SEPARATOR1, textureAtlasPath, regionNames[0], regionNames[1], regionNames[2], regionNames[3], regionNames[4], regionNames[5]);
 			writer.write(line);
@@ -327,7 +325,8 @@ public class LevelIO {
 				entity.getTransform().getTranslation(translation);
 				entity.getTransform().getRotation(rotation, true);
 				entity.getTransform().getScale(scale);
-				writer.append(Utils.encapsulateString(SEPARATOR1, entity.getName(), fileDescriptor.name, fileDescriptor.path, translation.x, translation.y, translation.z, rotation.getYawRad(), rotation.getPitchRad(), rotation.getRollRad(), scale.x, scale.y, scale.z));
+				String path = relativize(base, fileDescriptor.path);
+				writer.append(Utils.encapsulateString(SEPARATOR1, entity.getName(), fileDescriptor.name, path, translation.x, translation.y, translation.z, rotation.getYawRad(), rotation.getPitchRad(), rotation.getRollRad(), scale.x, scale.y, scale.z));
 				writer.newLine();
 			}
 						
@@ -339,7 +338,8 @@ public class LevelIO {
 
 			for(Decal decal : decals) {
 				fileDescriptor = (FileDescriptor) decal.getProperties().get(Constants.FILE_DESCRIPTOR);
-				writer.append(Utils.encapsulateString(SEPARATOR1, Utils.encapsulateString(SEPARATOR2, decal.getName(), decal.textureArea.userObject), fileDescriptor.name, fileDescriptor.path, decal.position.x, decal.position.y, decal.position.z, decal.halfWidth, decal.halfHeight));
+				String path = relativize(base, fileDescriptor.path);
+				writer.append(Utils.encapsulateString(SEPARATOR1, Utils.encapsulateString(SEPARATOR2, decal.getName(), decal.textureArea.userObject), fileDescriptor.name, path, decal.position.x, decal.position.y, decal.position.z, decal.halfWidth, decal.halfHeight));
 				writer.newLine();
 			}
 			
@@ -362,6 +362,11 @@ public class LevelIO {
 
 	}
 	
+	private static String relativize(URI base, String pathname) {
+		if(pathname == null) return null;
+		return base.relativize(new File(pathname).toURI()).getPath();
+	}
+
 	/* Testing.... */
 	public static void importGTA2Level(File file, Presenter presenter) throws Exception {
 		
