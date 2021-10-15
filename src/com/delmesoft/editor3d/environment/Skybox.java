@@ -155,13 +155,13 @@ public class Skybox implements Disposable {
 			worldView.set(camera.projection);
 			worldView.mul(transform);
 									
-			program.begin();
+			program.bind();
 			for(Entry<Texture, Mesh> entry : meshMap.entrySet()) {
 				program.setUniformMatrix(u_worldView, worldView);
 				program.setUniformi(u_texture, context.textureBinder.bind(entry.getKey()));
 				entry.getValue().render(program, GL20.GL_TRIANGLES);
 			}
-			program.end();
+			// program.end();
 			
 		} else {
 			disposeMeshes();
