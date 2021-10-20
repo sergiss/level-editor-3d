@@ -6,6 +6,7 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="assets"/>
 	<classpathentry kind="lib" path="libs/gdx-backend-lwjgl-natives.jar"/>
 	<classpathentry kind="lib" path="libs/gdx-backend-lwjgl-sources.jar"/>
 	<classpathentry kind="lib" path="libs/gdx-backend-lwjgl.jar"/>
@@ -14,3 +15,4 @@
 	<classpathentry kind="lib" path="libs/gdx.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
+
